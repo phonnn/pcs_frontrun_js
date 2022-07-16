@@ -1,0 +1,12 @@
+{
+  "name": "frontrun_psc_js",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "_phonnn",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "abi-decoder": "^2.4.0",
+    "web3": "^1.7.4"
+  }
+}
