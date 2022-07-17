@@ -93,7 +93,7 @@ function frontValueCalculate(resvETH, resvToken, targetValue, amountOut, exactIn
         frontrunValue = amountInTraceback(resvETH, resvToken, expectedAmountIn, amountOut)
     }
 
-    if(frontrunValue >= targetValue){
+    if(frontrunValue >= targetValue || frontrunValue == 0){
         frontrunValue = targetValue/5;
     }
     return frontrunValue

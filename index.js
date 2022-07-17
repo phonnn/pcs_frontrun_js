@@ -22,8 +22,8 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
     if (!error) {
         web3.eth.getTransaction(txhash, async (error, tx) => {
             if (tx != null) {
+                var startBlock = await web3.eth.getBlockNumber();
                 if(tx.to != null && tx.to.toLowerCase() == ROUTER_ADDRESS && ['0xfb3bdb41', '0x7ff36ab5'].includes(tx.input.slice(0, 10))){
-                    // console.log(tx);
                     let decodedData = decodeMethod(tx.input);
                     var amountOut, exactIn;
                     if (decodedData.name == 'swapExactETHForTokens') {
@@ -53,8 +53,15 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
     
                         let rateChange = rateChangeCalculate(Number(revs0), Number(revs1), Number(tx.value), exactIn);
                         if(rateChange > 0.5){
-                            let frontValue = frontValueCalculate(Number(revs0), Number(revs1), Number(tx.value), Number(amountOut.value), exactIn);   
+                            let frontValue = frontValueCalculate(Number(revs0), Number(revs1), Number(tx.value), Number(amountOut.value), exactIn);
                             let profits = revenueCalculate(Number(revs0), Number(revs1), Number(tx.value), frontValue, exactIn);
+                            var endBlock = await web3.eth.getBlockNumber();
+
+                            if(profits/1e18 < 0.004 || startBlock != endBlock){
+                                return
+                            }
+                            
+                            //đặt lệnh mua bán ở đây
                             console.log('profits', profits/1e18);
                         }
                     } catch (error) {
