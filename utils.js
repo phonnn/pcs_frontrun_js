@@ -1,11 +1,11 @@
-function getAmountOut(reserveIn, reserveOut, amountIn) {
-    amountIn *= 0.9975
-    let numerator = amountIn * reserveOut
-    let denominator = reserveIn + amountIn
+function getAmountOut(amountIn, reserveIn, reserveOut) {
+    let amountInWithFee = amountIn * 0.9975;
+    let numerator = amountInWithFee * reserveOut;
+    let denominator = reserveIn + amountInWithFee;
     return numerator / denominator
 }
 
-function getAmountIn(reserveIn, reserveOut, amountOut) {
+function getAmountIn(amountOut, reserveIn, reserveOut) {
     let numerator = reserveIn * amountOut
     let denominator = (reserveOut - amountOut) * 0.9975
     return numerator / denominator
@@ -57,11 +57,11 @@ function rateChangeCalculate(reserveIn, reserveOut, amount, exactIn = true) {
     let rate0 = reserveIn / reserveOut
 
     if (exactIn) {
-        let amountOut = getAmountOut(reserveIn, reserveOut, amount)
+        let amountOut = getAmountOut(amount, reserveIn, reserveOut)
         reserveIn += amount
         reserveOut -= amountOut
     } else {
-        let amountIn = getAmountIn(reserveIn, reserveOut, amount)
+        let amountIn = getAmountIn(amount, reserveIn, reserveOut)
         reserveIn += amountIn
         reserveOut -= amount
     }
@@ -86,43 +86,53 @@ function frontValueCalculate(resvETH, resvToken, targetValue, amountOut, exactIn
         var expectedAmountIn;
         var minAmountIn = getAmountIn(resvETH, resvToken, amountOut)
         if (minAmountIn < targetValue) {
-            expectedAmountIn = targetValue * 0.999
+            expectedAmountIn = targetValue * 0.9
         } else {
             throw "EXCESSIVE_INPUT_AMOUNT"
         }
         frontrunValue = amountInTraceback(resvETH, resvToken, expectedAmountIn, amountOut)
     }
 
-    if(frontrunValue >= targetValue || frontrunValue == 0){
-        frontrunValue = targetValue/5;
+    if (frontrunValue >= targetValue || frontrunValue == 0) {
+        frontrunValue = targetValue / 5;
     }
-    return frontrunValue
+
+    return Math.floor(frontrunValue)
 }
 
-function revenueCalculate(resvETH, resvToken, targetValue, frontValue, exactIn = True) {
+function revenueCalculate(resvETH, resvToken, targetIn, targetOut, frontValue, exactIn = true) {
     // exactIn = true => swapExactETHForTokens => targetValue = ETH amount
     // exactIn = false => swapETHForExactTokens => targetValue = Token amount
-    let frontRunAmountOut = getAmountOut(resvETH, resvToken, frontValue)
-    console.log(`front run: ${frontValue/1e18} ETH -> ${frontRunAmountOut} Token`)
-    resvETH += frontValue
-    resvToken -= frontRunAmountOut
+    // fornt run
+    let frontRunAmountOut = getAmountOut(frontValue, resvETH, resvToken);
+    resvETH += frontValue;
+    resvToken -= frontRunAmountOut;
+    console.log(`front run: ${frontValue/1e18} BNB -> ${frontRunAmountOut} TOKEN`);
 
+    // target transactions
     if (exactIn) {
-        let amountOut = getAmountOut(resvETH, resvToken, targetValue)
-        resvETH += targetValue
+        let amountOut = getAmountOut(targetIn, resvETH, resvToken)
+        resvETH += targetIn
         resvToken -= amountOut
-        console.log(`target order: ${targetValue/1e18} ETH -> ${amountOut} Token`)
+        console.log(`target: ${targetIn/1e18} BNB -> ${amountOut} TOKEN`);
     } else {
-        let amountIn = getAmountIn(resvETH, resvToken, targetValue)
+        let amountIn = getAmountIn(targetOut, resvETH, resvToken)
         resvETH += amountIn
-        resvToken -= targetValue
-        console.log(`target order: ${amountIn/1e18} ETH -> ${targetValue} Token`)
-    }
-    
-    let backRunAmountOut = getAmountOut(resvToken, resvETH, frontRunAmountOut)
-    console.log(`back run: ${frontRunAmountOut} Token -> ${backRunAmountOut/1e18} ETH`)
+        resvToken -= targetOut
+        console.log(`target: ${amountIn/1e18} BNB -> ${targetOut} TOKEN`);
 
-    return backRunAmountOut - frontValue
+    }
+
+    // back run
+    let backRunAmountOut = getAmountOut(frontRunAmountOut, resvToken, resvETH);
+    console.log(`back run: ${frontRunAmountOut} TOKEN -> ${backRunAmountOut/1e18} BNB\n`);
+
+    return backRunAmountOut
 }
 
-export {rateChangeCalculate, frontValueCalculate, revenueCalculate}
+function findTokenInfo(tokenObj, tokenAddress) {
+    let checksumAddress = Object.keys(tokenObj).find(token => token.toLowerCase() == tokenAddress.toLowerCase());
+    return tokenObj[checksumAddress]
+}
+
+export { rateChangeCalculate, frontValueCalculate, revenueCalculate, getAmountOut, findTokenInfo }
