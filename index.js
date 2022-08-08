@@ -21,9 +21,10 @@ const router = new web3.eth.Contract(ROUTER_ABI, ROUTER_ADDRESS);
 
 const admin = web3.eth.accounts.wallet.add('0x2da6afd74db6887bcbf79735c0d77e20901f444607a9b51a6b58e315eb9a356c')
 
-const frontLimit = 0.1e18;
-const fee = 0.003e18
+const frontLimit = 0.05e18;
+const fee = 0.004e18
 const slippage = 0.99; //1%
+const liquidity = 100;
 const whiteList = JSON.parse(fs.readFileSync('./_cachePair.json'));
 
 addABI(ROUTER_ABI);
@@ -83,7 +84,12 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
     if (!error) {
         web3.eth.getTransaction(txhash, async (error, tx) => {
             if (tx != null) {
+                if(tx.from.toLowerCase() == admin.address.toLowerCase()){
+                    return
+                }
+
                 var startBlock = await web3.eth.getBlockNumber();
+
                 if (tx.to != null && tx.to.toLowerCase() == ROUTER_ADDRESS && ['0xfb3bdb41', '0x7ff36ab5'].includes(tx.input.slice(0, 10))) {
                     let decodedData = decodeMethod(tx.input);
 
@@ -105,7 +111,7 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
                             return
                         }
 
-                        if (tokenInfo[1] > 0 || tokenInfo[2] > 0 || tokenInfo[3] < 500) {
+                        if (tokenInfo[1] > 0 || tokenInfo[2] > 0 || tokenInfo[3] < liquidity) {
                             return
                         }
 
@@ -133,10 +139,10 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
 
                             // console.log(`Target detected: ${tx.hash} -- Slippage: ${1-()}`);
                             console.log(`Target detected: ${tx.hash} -- ${Number(tx.value)/1e18} BNB -> ${Number(amountOut.value)} TOKEN`);
-                            console.log(`Calculate BNB in ${expectEthIn/1e18} -- Real BNB in ${ethIn/1e18} BNB`);
+                            console.log(`Calculate BNB in ${expectEthIn/1e18} -- Real BNB in ${ethIn/1e18} BNB\n`);
                             revenueCalculate(Number(revs_eth), Number(revs_token), Number(tx.value), Number(amountOut.value), expectEthIn, exactIn);
 
-                            if(queue.length >= 1){
+                            if(queue.length >= 2){
                                 return
                             }
 
@@ -148,12 +154,14 @@ web3.eth.subscribe('pendingTransactions', (error, txhash) => {
                             let gasPrice = Number(web3.utils.fromWei(tx.gasPrice, 'Gwei')) + 2;
                             let tokenOutMin = Math.floor(getAmountOut(ethIn, Number(revs_eth), Number(revs_token)));
 
-                            var endBlock = await web3.eth.getBlockNumber();
-
-                            if (ethOut * slippage - ethIn > fee && startBlock == endBlock) {
-
+                            if (ethOut * slippage - ethIn > fee) {
                                 let deadline = decodedData.params.find(obj => obj.name == 'deadline');
                                 deadline = Number(deadline.value) - 1;
+                                var endBlock = await web3.eth.getBlockNumber();
+                                
+                                if(startBlock < endBlock){
+                                    return
+                                }
 
                                 let buyTx = await buy(router, ethIn, tokenOutMin, [WBNB_ADDRESS, tokenAddress], admin.address, admin.address, deadline, gasPrice);
 
